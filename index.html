@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Quran Majeed Online</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:Arial,sans-serif;
+  background:#f4f8f6;color:#12382e;
+  transition:.3s;
+}
+body.dark{background:#101817;color:#eee}
+
+header{
+  background:linear-gradient(135deg,#063b2d,#087f68);
+  color:white;text-align:center;padding:45px 15px;
+}
+header h1{font-size:38px;margin-bottom:10px}
+header p{font-size:17px}
+
+nav{
+  position:sticky;top:0;z-index:100;
+  background:white;padding:13px;
+  display:flex;justify-content:center;gap:20px;
+  box-shadow:0 2px 10px #0002;
+}
+.dark nav{background:#182321}
+nav button{
+  border:0;background:none;color:#08705c;
+  font-weight:bold;cursor:pointer;font-size:15px
+}
+
+.container{max-width:1100px;margin:auto;padding:25px 15px}
+
+.search{
+  display:flex;gap:10px;margin-bottom:25px
+}
+.search input{
+  flex:1;padding:15px;border:1px solid #ddd;
+  border-radius:10px;font-size:16px
+}
+.search button,.mainBtn{
+  border:0;background:#087f68;color:white;
+  padding:14px 20px;border-radius:10px;
+  cursor:pointer;font-weight:bold
+}
+
+.sectionTitle{text-align:center;margin:25px 0}
+
+#surahs{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:15px;
+}
+
+.card{
+  background:white;padding:20px;border-radius:15px;
+  box-shadow:0 4px 15px #0001;cursor:pointer;
+  transition:.2s
+}
+.dark .card{background:#192421;color:#eee}
+.card:hover{transform:translateY(-3px)}
+.num{
+  width:38px;height:38px;border-radius:50%;
+  background:#087f68;color:white;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:12px
+}
+.arabicSmall{
+  direction:rtl;font-size:25px;margin-top:8px
+}
+
+#reader{display:none}
+.readerHead{
+  background:#087f68;color:white;
+  padding:25px;border-radius:15px;
+  text-align:center;margin-bottom:20px
+}
+.readerHead h2{font-size:30px}
+.ayah{
+  background:white;padding:22px;margin:14px 0;
+  border-radius:14px;box-shadow:0 3px 12px #0001
+}
+.dark .ayah{background:#192421}
+.ayahNo{
+  color:#087f68;font-weight:bold;margin-bottom:10px
+}
+.arabic{
+  direction:rtl;text-align:right;
+  font-size:31px;line-height:2.1;
+  margin-bottom:14px
+}
+.urdu{
+  direction:rtl;text-align:right;
+  font-size:19px;line-height:1.9;
+  margin-bottom:8px
+}
+.english{line-height:1.6;color:#557}
+audio{width:100%;margin-top:12px}
+
+.actions{
+  display:flex;gap:8px;flex-wrap:wrap;margin-top:15px
+}
+.actions button{
+  border:0;padding:9px 13px;border-radius:8px;
+  cursor:pointer;background:#087f68;color:white
+}
+
+.loading{text-align:center;padding:30px;font-size:18px}
+
+footer{
+  background:#063b2d;color:white;text-align:center;
+  padding:30px;margin-top:40px
+}
+
+.hidden{display:none!important}
+
+@media(max-width:600px){
+  header h1{font-size:29px}
+  nav{gap:8px;flex-wrap:wrap}
+  .search{flex-direction:column}
+  .arabic{font-size:27px}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>☪ Quran Majeed Online</h1>
+  <p>Read • Listen • Understand • Reflect</p>
+</header>
+
+<nav>
+  <button onclick="showHome()">🏠 Home</button>
+  <button onclick="showBookmarks()">🔖 Bookmarks</button>
+  <button onclick="toggleDark()">🌙 Dark Mode</button>
+</nav>
+
+<div class="container">
+
+  <section id="home">
+
+    <div class="search">
+      <input id="search"
+        placeholder="Search Surah by name or number..."
+        oninput="filterSurahs()">
+    </div>
+
+    <h2 class="sectionTitle">📖 Holy Quran — 114 Surahs</h2>
+
+    <div id="surahs">
+      <div class="loading">Loading Quran...</div>
+    </div>
+
+  </section>
+
+  <section id="reader">
+
+    <button class="mainBtn" onclick="showHome()">← Back to Surahs</button>
+
+    <div id="readerHeader" class="readerHead"></div>
+
+    <div id="ayahs">
+      <div class="loading">Loading...</div>
+    </div>
+
+  </section>
+
+  <section id="bookmarksSection" class="hidden">
+    <h2 class="sectionTitle">🔖 My Bookmarks</h2>
+    <div id="bookmarks"></div>
+  </section>
+
+</div>
+
+<footer>
+  <h3>☪ Quran Majeed Online</h3>
+  <p style="margin-top:8px">Read the Holy Quran Online</p>
+  <p style="margin-top:12px">© 2026 Quran Majeed Online</p>
+</footer>
+
+<script>
+
+const API="https://api.alquran.cloud/v1";
+
+let allSurahs=[];
+let currentSurah=null;
+
+/* Load all 114 Surahs */
+async function loadSurahs(){
+
+  const box=document.getElementById("surahs");
+
+  try{
+
+    const response=await fetch(API+"/surah");
+    const data=await response.json();
+
+    allSurahs=data.data;
+
+    renderSurahs(allSurahs);
+
+  }catch(error){
+
+    box.innerHTML=
+      "<div class='loading'>Quran load nahi ho saka. Internet connection check karein.</div>";
+
+  }
+}
+
+/* Show Surahs */
+function renderSurahs(list){
+
+  const box=document.getElementById("surahs");
+
+  box.innerHTML="";
+
+  if(!list.length){
+    box.innerHTML="<div class='loading'>Surah nahi mili.</div>";
+    return;
+  }
+
+  list.forEach(s=>{
+
+    const div=document.createElement("div");
+    div.className="card";
+
+    div.innerHTML=`
+      <div class="num">${s.number}</div>
+      <h3>${escapeHTML(s.englishName)}</h3>
+      <p>${escapeHTML(s.englishNameTranslation)}</p>
+      <div class="arabicSmall">${escapeHTML(s.name)}</div>
+    `;
+
+    div.onclick=()=>openSurah(s.number);
+
+    box.appendChild(div);
+
+  });
+}
+
+/* Search */
+function filterSurahs(){
+
+  const q=document.getElementById("search").value.toLowerCase().trim();
+
+  const result=allSurahs.filter(s=>
+    String(s.number)===q ||
+    s.name.toLowerCase().includes(q) ||
+    s.englishName.toLowerCase().includes(q) ||
+    s.englishNameTranslation.toLowerCase().includes(q)
+  );
+
+  renderSurahs(q?result:allSurahs);
+}
+
+/* Open Surah */
+async function openSurah(number){
+
+  currentSurah=number;
+
+  document.getElementById("home").style.display="none";
+  document.getElementById("bookmarksSection").classList.add("hidden");
+  document.getElementById("reader").style.display="block";
+
+  const header=document.getElementById("readerHeader");
+  const ayahs=document.getElementById("ayahs");
+
+  header.innerHTML="<h2>Loading...</h2>";
+  ayahs.innerHTML="<div class='loading'>Ayahs load ho rahi hain...</div>";
+
+  window.scrollTo({top:0,behavior:"smooth"});
+
+  try{
+
+    /*
+      Arabic + Urdu + English
+      + audio
+    */
+
+    const url=
+      API+"/surah/"+number+
+      "/editions/quran-uthmani,ur.jalandhry,en.asad,ar.alafasy";
+
+    const response=await fetch(url);
+    const data=await response.json();
+
+    const editions=data.data;
+
+    const arabic=editions[0];
+    const urdu=editions[1];
+    const english=editions[2];
+    const audio=editions[3];
+
+    header.innerHTML=`
+      <h2>${escapeHTML(arabic.name)}</h2>
+      <p>${arabic.numberOfAyahs} Ayahs</p>
+      <p>${escapeHTML(arabic.englishName)} — ${escapeHTML(arabic.englishNameTranslation)}</p>
+    `;
+
+    ayahs.innerHTML="";
+
+    arabic.ayahs.forEach((a,i)=>{
+
+      const urduText=urdu.ayahs[i]?.text || "";
+      const englishText=english.ayahs[i]?.text || "";
+      const audioURL=audio.ayahs[i]?.audio || "";
+
+      const div=document.createElement("div");
+      div.className="ayah";
+
+      div.innerHTML=`
+
+        <div class="ayahNo">
+          Ayah ${a.numberInSurah}
+        </div>
+
+        <div class="arabic">
+          ${escapeHTML(a.text)}
+        </div>
+
+        <div class="urdu">
+          ${escapeHTML(urduText)}
+        </div>
+
+        <div class="english">
+          ${escapeHTML(englishText)}
+        </div>
+
+        ${
+          audioURL
+          ? `<audio controls preload="none" src="${audioURL}"></audio>`
+          : ""
+        }
+
+        <div class="actions">
+          <button onclick="bookmarkAyah(
+            ${number},
+            ${a.numberInSurah},
+            '${encodeURIComponent(a.text)}'
+          )">
+            🔖 Bookmark
+          </button>
+
+          <button onclick="copyAyah('${encodeURIComponent(a.text)}')">
+            📋 Copy Arabic
+          </button>
+        </div>
+      `;
+
+      ayahs.appendChild(div);
+
+    });
+
+  }catch(error){
+
+    ayahs.innerHTML=
+      "<div class='loading'>Ayahs load nahi ho sake. Internet check karein.</div>";
+
+  }
+}
+
+/* Bookmark */
+function bookmarkAyah(surah,ayah,text){
+
+  let bookmarks=
+    JSON.parse(localStorage.getItem("quranBookmarks")||"[]");
+
+  const exists=bookmarks.some(
+    x=>x.surah===surah && x.ayah===ayah
+  );
+
+  if(!exists){
+
+    bookmarks.push({
+      surah:surah,
+      ayah:ayah,
+      text:decodeURIComponent(text)
+    });
+
+    localStorage.setItem(
+      "quranBookmarks",
+      JSON.stringify(bookmarks)
+    );
+
+    alert("Ayah bookmark ho gayi ❤️");
+
+  }else{
+    alert("Ye ayah already bookmarked hai.");
+  }
+}
+
+/* Show bookmarks */
+function showBookmarks(){
+
+  document.getElementById("home").style.display="none";
+  document.getElementById("reader").style.display="none";
+  document.getElementById("bookmarksSection").classList.remove("hidden");
+
+  const box=document.getElementById("bookmarks");
+
+  const bookmarks=
+    JSON.parse(localStorage.getItem("quranBookmarks")||"[]");
+
+  box.innerHTML="";
+
+  if(!bookmarks.length){
+
+    box.innerHTML=
+      "<div class='loading'>Abhi koi bookmark nahi hai.</div>";
+
+    return;
+  }
+
+  bookmarks.forEach((b,index)=>{
+
+    const div=document.createElement("div");
+    div.className="ayah";
+
+    div.innerHTML=`
+      <div class="ayahNo">
+        Surah ${b.surah} — Ayah ${b.ayah}
+      </div>
+
+      <div class="arabic">
+        ${escapeHTML(b.text)}
+      </div>
+
+      <div class="actions">
+        <button onclick="openSurah(${b.surah})">
+          📖 Open Surah
+        </button>
+
+        <button onclick="deleteBookmark(${index})">
+          🗑 Remove
+        </button>
+      </div>
+    `;
+
+    box.appendChild(div);
+
+  });
+
+}
+
+/* Delete bookmark */
+function deleteBookmark(index){
+
+  let bookmarks=
+    JSON.parse(localStorage.getItem("quranBookmarks")||"[]");
+
+  bookmarks.splice(index,1);
+
+  localStorage.setItem(
+    "quranBookmarks",
+    JSON.stringify(bookmarks)
+  );
+
+  showBookmarks();
+}
+
+/* Copy */
+function copyAyah(text){
+
+  navigator.clipboard.writeText(
+    decodeURIComponent(text)
+  );
+
+  alert("Arabic Ayah copied.");
+}
+
+/* Home */
+function showHome(){
+
+  document.getElementById("home").style.display="block";
+  document.getElementById("reader").style.display="none";
+  document.getElementById("bookmarksSection").classList.add("hidden");
+
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* Dark mode */
+function toggleDark(){
+
+  document.body.classList.toggle("dark");
+
+  localStorage.setItem(
+    "darkMode",
+    document.body.classList.contains("dark")
+  );
+
+}
+
+/* Security helper */
+function escapeHTML(text){
+
+  return String(text)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+}
+
+/* Remember dark mode */
+if(localStorage.getItem("darkMode")==="true"){
+  document.body.classList.add("dark");
+}
+
+/* Start */
+loadSurahs();
+
+</script>
+
+</body>
+</html>
